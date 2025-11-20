@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>2048 - 终极修复版</title>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&display=swap" rel="stylesheet">
+    <style>
+        /* ==================== 1. 核心变量定义 (粉色默认) ==================== */
+        :root {
+            --bg-color: #ffebee;
+            --bg-image: radial-gradient(#f48fb1 20%, transparent 20%), radial-gradient(#f48fb1 20%, transparent 20%);
+            --grid-bg: #f8bbd0;
+            --empty-cell: #ffcdd2;
+            --text-color: #880e4f;
+            --card-bg: rgba(255, 255, 255, 0.85);
+            --btn-bg: #880e4f;
+            --btn-shadow: #560027;
+            --score-bg: #ec407a;
+            --score-shadow: #c2185b;
+            
+            /* 装饰球颜色 */
+            --blob-color: linear-gradient(45deg, #f8bbd0, #f06292);
+
+            /* 尺寸定义 */
+            --grid-size: 340px;
+            --tile-size: 70px;
+            --tile-gap: 12px; 
+
+            /* 方块通用字体颜色 */
+            --tile-text-dark: #880e4f;
+            --tile-text-light: #ffffff;
+
+            /* 方块背景色 (默认粉色系) */
+            --t2: #fff0f5; --t4: #ffe4e1; --t8: #f48fb1; --t16: #ec407a;
+            --t32: #d81b60; --t64: #c2185b; --t128: #ad1457; --t256: #880e4f;
+            --t512: #fbc02d; 
+        }
+
+        /* ==================== 2. 皮肤定义 ==================== */
+        
+        /* 🌊 深海主题 (Blue) */
+        body.theme-blue {
+            --bg-color: #e0f7fa;
+            --bg-image: radial-gradient(#4dd0e1 20%, transparent 20%), radial-gradient(#4dd0e1 20%, transparent 20%);
+            --grid-bg: #b2ebf2;
+            --empty-cell: #80deea;
+            --text-color: #006064;
+            --card-bg: rgba(255, 255, 255, 0.85);
+            --btn-bg: #00838f;
+            --btn-shadow: #005662;
+            --score-bg: #0097a7;
+            --score-shadow: #006064;
+            --blob-color: linear-gradient(45deg, #80deea, #26c6da);
+            
+            --tile-text-dark: #006064;
+            --t2: #e1f5fe; --t4: #b3e5fc; --t8: #4fc3f7; --t16: #29b6f6;
+            --t32: #039be5; --t64: #0288d1; --t128: #0277bd; --t256: #01579b;
+            --t512: #fbc02d; 
+        }
+
+        /* 🌑 暗夜主题 (Dark) */
+        body.theme-dark {
+            --bg-color: #212121;
+            --bg-image: radial-gradient(#424242 20%, transparent 20%), radial-gradient(#424242 20%, transparent 20%);
+            --grid-bg: #424242;
+            --empty-cell: #616161;
+            --text-color: #ffffff;
+            --card-bg: rgba(30, 30, 30, 0.95);
+            --btn-bg: #757575;
+            --btn-shadow: #000000;
+            --score-bg: #616161;
+            --score-shadow: #212121;
+            --blob-color: linear-gradient(45deg, #424242, #616161);
+
+            --tile-text-dark: #212121; 
+            --t2: #eeeeee; --t4: #e0e0e0; --t8: #bdbdbd; --t16: #9e9e9e;
+            --t32: #757575; --t64: #616161; --t128: #424242; --t256: #212121;
+            --t512: #ffd740;
+        }
+
+        /* ==================== 3. 基础布局 ==================== */
+
+        body {
+            margin: 0; padding: 0;
+            font-family: 'Fredoka One', cursive;
+            background-color: var(--bg-color);
+            background-image: var(--bg-image);
+            background-position: 0 0, 25px 25px;
+            background-size: 50px 50px;
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            user-select: none;
+            overflow: hidden;
+            touch-action: none; 
+            transition: background-color 0.5s, color 0.5s;
+        }
+
+        .main-container {
+            background: var(--card-bg);
+            backdrop-filter: blur(10px);
+            padding: 30px 40px;
+            border-radius: 40px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1), 0 5px 15px rgba(0,0,0,0.05);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            border: 4px solid rgba(255,255,255,0.3);
+            position: relative;
+            z-index: 1;
+            transition: background 0.5s;
+        }
+
+        h1 {
+            font-size: 3.5rem;
+            margin: 0 0 15px 0;
+            color: var(--score-bg);
+            text-shadow: 4px 4px 0px rgba(255,255,255,0.5);
+        }
+
+        /* ==================== 4. 顶部工具栏 ==================== */
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            width: var(--grid-size);
+            margin-bottom: 10px;
+            z-index: 10; /* 确保按钮在最上层 */
+        }
+
+        .icon-btn {
+            background: var(--btn-bg);
+            color: white;
+            border: none;
+            width: 40px; height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 1.2rem;
+            box-shadow: 0 3px 0 var(--btn-shadow);
+            display: flex; justify-content: center; align-items: center;
+            transition: transform 0.1s, background 0.5s;
+            z-index: 10;
+        }
+        .icon-btn:active { transform: translateY(3px); box-shadow: none; }
+
+        .header-container {
+            display: flex;
+            justify-content: space-between;
+            width: var(--grid-size);
+            margin-bottom: 20px;
+            align-items: center;
+        }
+
+        .score-box {
+            background: var(--score-bg);
+            padding: 8px 20px;
+            border-radius: 20px;
+            color: white;
+            text-align: center;
+            min-width: 90px;
+            box-shadow: 0 4px 0 var(--score-shadow);
+            transition: background 0.5s;
+        }
+        .score-label { font-size: 0.8rem; opacity: 0.9; }
+        .score-val { font-size: 1.6rem; }
+
+        button.big-btn {
+            background: var(--btn-bg);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-family: 'Fredoka One', cursive;
+            font-size: 1rem;
+            border-radius: 15px;
+            cursor: pointer;
+            box-shadow: 0 4px 0 var(--btn-shadow);
+            transition: transform 0.1s, background 0.5s;
+            outline: none;
+        }
+        button.big-btn:active { transform: translateY(4px); box-shadow: none; }
+
+        /* ==================== 5. 游戏区域 ==================== */
+
+        #game-board-container {
+            width: var(--grid-size);
+            height: var(--grid-size);
+            background-color: var(--grid-bg);
+            border-radius: 15px;
+            position: relative; 
+            padding: 0; 
+            box-shadow: inset 0 4px 10px rgba(0,0,0,0.1);
+            box-sizing: border-box;
+            transition: background-color 0.5s;
+        }
+
+        .game-layer {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;
+        }
+
+        .grid-cell {
+            width: var(--tile-size); height: var(--tile-size);
+            background-color: var(--empty-cell);
+            border-radius: 10px;
+            position: absolute; z-index: 1;
+            transition: background-color 0.5s;
+        }
+
+        .tile {
+            width: var(--tile-size); height: var(--tile-size);
+            position: absolute; z-index: 2;
+        }
+        .tile.tile-moving { transition: transform 150ms ease-in-out; }
+
+        .tile-inner {
+            width: 100%; height: 100%;
+            border-radius: 10px;
+            display: flex; justify-content: center; align-items: center;
+            font-size: 2rem; font-weight: bold;
+            color: var(--tile-text-dark);
+            box-shadow: 0 4px 0 rgba(0,0,0,0.1);
+            animation: appear 200ms cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+
+        @keyframes appear { 0% { transform: scale(0); } 100% { transform: scale(1); } }
+        .tile-pop .tile-inner { animation: pop 200ms ease-in; }
+        @keyframes pop { 0% { transform: scale(1); } 50% { transform: scale(1.2); } 100% { transform: scale(1); } }
+
+        /* 方块颜色映射 */
+        .tile-2 .tile-inner { background: var(--t2); }
+        .tile-4 .tile-inner { background: var(--t4); }
+        .tile-8 .tile-inner { background: var(--t8); color: var(--tile-text-light); }
+        .tile-16 .tile-inner { background: var(--t16); color: var(--tile-text-light); }
+        .tile-32 .tile-inner { background: var(--t32); color: var(--tile-text-light); }
+        .tile-64 .tile-inner { background: var(--t64); color: var(--tile-text-light); font-size: 1.8rem; }
+        .tile-128 .tile-inner { background: var(--t128); color: var(--tile-text-light); font-size: 1.6rem; }
+        .tile-256 .tile-inner { background: var(--t256); color: var(--tile-text-light); font-size: 1.5rem; box-shadow: 0 0 15px var(--btn-bg); }
+        .tile-512 .tile-inner, .tile-1024 .tile-inner, .tile-2048 .tile-inner { 
+            background: var(--t512); color: #fff; font-size: 1.4rem; box-shadow: 0 0 20px #ffd740; 
+        }
+
+        #game-over {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--card-bg);
+            border-radius: 15px;
+            display: flex; flex-direction: column;
+            justify-content: center; align-items: center;
+            z-index: 100; opacity: 0; pointer-events: none;
+            transition: opacity 0.5s;
+        }
+        #game-over.show { opacity: 1; pointer-events: all; }
+        #game-over h2 { font-size: 2.5rem; color: var(--text-color); margin-bottom: 15px; }
+
+        .controls-hint { margin-top: 25px; font-size: 0.9rem; opacity: 0.8; }
+
+        /* 装饰球 */
+        .decoration {
+            position: absolute; border-radius: 50%;
+            background: var(--blob-color);
+            z-index: -1; opacity: 0.6;
+            animation: float 6s ease-in-out infinite;
+            transition: background 0.5s;
+        }
+        .blob-1 { width: 200px; height: 200px; top: -50px; left: -50px; }
+        .blob-2 { width: 150px; height: 150px; bottom: -30px; right: -30px; animation-delay: 1s; }
+        .blob-3 { width: 80px; height: 80px; bottom: 20%; left: 10%; background: #fff; opacity: 0.4; }
+        @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-20px); } }
+
+        @media (max-width: 500px) {
+            :root { --grid-size: 300px; --tile-size: 60px; }
+            .main-container { padding: 20px; }
+            h1 { font-size: 3rem; }
+            .decoration { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="decoration blob-1"></div>
+    <div class="decoration blob-2"></div>
+    <div class="decoration blob-3"></div>
+
+    <div class="main-container">
+        <div class="top-bar">
+            <button class="icon-btn" id="sound-btn" onclick="toggleSound()">🔊</button>
+            <button class="icon-btn" id="theme-btn" onclick="toggleTheme()">🎨</button>
+        </div>
+
+        <h1>2048</h1>
+        
+        <div class="header-container">
+            <button class="big-btn" onclick="game.restart()">新游戏</button>
+            <div class="score-box">
+                <div class="score-label">SCORE</div>
+                <div class="score-val" id="score">0</div>
+            </div>
+        </div>
+
+        <div id="game-board-container">
+            <div id="grid-bg-layer" class="game-layer"></div>
+            <div id="tile-container" class="game-layer"></div>
+            <div id="game-over">
+                <h2>Game Over!</h2>
+                <button class="big-btn" onclick="game.restart()">再来一次</button>
+            </div>
+        </div>
+
+        <div class="controls-hint">使用方向键或滑动屏幕</div>
+    </div>
+
+    <script>
+        // ================= 音效管理器 =================
+        class SoundManager {
+            constructor() {
+                this.ctx = null;
+                this.enabled = true;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioContext();
+                }
+                if (this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            }
+
+            play(type) {
+                if (!this.enabled || !this.ctx) return;
+                
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                const now = this.ctx.currentTime;
+
+                if (type === 'move') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(150, now);
+                    osc.frequency.exponentialRampToValueAtTime(100, now + 0.1);
+                    gain.gain.setValueAtTime(0.1, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                    osc.start(now);
+                    osc.stop(now + 0.1);
+                } 
+                else if (type === 'merge') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(400, now);
+                    osc.frequency.exponentialRampToValueAtTime(800, now + 0.15);
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+                    osc.start(now);
+                    osc.stop(now + 0.2);
+                } 
+                else if (type === 'gameover') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(400, now);
+                    osc.frequency.linearRampToValueAtTime(100, now + 0.8);
+                    gain.gain.setValueAtTime(0.3, now);
+                    gain.gain.linearRampToValueAtTime(0.01, now + 0.8);
+                    osc.start(now);
+                    osc.stop(now + 0.8);
+                }
+            }
+        }
+
+        const soundManager = new SoundManager();
+        const soundBtn = document.getElementById('sound-btn');
+        
+        function toggleSound() {
+            soundManager.enabled = !soundManager.enabled;
+            soundBtn.innerText = soundManager.enabled ? '🔊' : '🔇';
+            if(soundManager.enabled) soundManager.init(); 
+        }
+
+        // ================= 皮肤管理器 (修复版) =================
+        const themes = ['', 'theme-blue', 'theme-dark'];
+        let currentThemeIdx = 0;
+        
+        function toggleTheme() {
+            // 1. 暴力移除所有自定义皮肤类，回到默认状态
+            document.body.classList.remove('theme-blue', 'theme-dark');
+
+            // 2. 计算下个索引
+            currentThemeIdx = (currentThemeIdx + 1) % themes.length;
+
+            // 3. 如果是有效的非空皮肤名，添加它
+            // (当 currentThemeIdx 为 0 时，themes[0] 是空字符串，if不成立，正好保留默认)
+            if(themes[currentThemeIdx]) {
+                document.body.classList.add(themes[currentThemeIdx]);
+            }
+            
+            // 触发音效反馈
+            soundManager.init();
+            soundManager.play('move');
+        }
+
+        // ================= 游戏逻辑 =================
+        const GRID_SIZE = 4;
+        let TILE_SIZE = 70;
+        let TILE_GAP = 12;
+
+        function updateMetrics() {
+            const computedStyle = getComputedStyle(document.documentElement);
+            const sizeStr = computedStyle.getPropertyValue('--tile-size').trim();
+            const gapStr = computedStyle.getPropertyValue('--tile-gap').trim();
+            TILE_SIZE = parseInt(sizeStr) || 70;
+            TILE_GAP = parseInt(gapStr) || 12;
+        }
+
+        class Tile {
+            constructor(container, value, x, y) {
+                this.container = container;
+                this.value = value;
+                this.x = x;
+                this.y = y;
+                this.element = document.createElement('div');
+                this.element.className = `tile tile-${value}`;
+                
+                this.inner = document.createElement('div');
+                this.inner.className = 'tile-inner';
+                this.inner.textContent = value;
+                this.element.appendChild(this.inner);
+
+                const left = this.x * (TILE_SIZE + TILE_GAP) + TILE_GAP;
+                const top = this.y * (TILE_SIZE + TILE_GAP) + TILE_GAP;
+                
+                this.element.style.transform = `translate(${left}px, ${top}px)`;
+                container.appendChild(this.element);
+
+                requestAnimationFrame(() => {
+                    this.element.classList.add('tile-moving');
+                });
+
+                this.mergedFrom = null; 
+            }
+
+            updatePosition() {
+                const left = this.x * (TILE_SIZE + TILE_GAP) + TILE_GAP;
+                const top = this.y * (TILE_SIZE + TILE_GAP) + TILE_GAP;
+                this.element.style.transform = `translate(${left}px, ${top}px)`;
+            }
+
+            updateValue(newValue) {
+                this.value = newValue;
+                this.inner.textContent = newValue;
+                this.element.className = `tile tile-${newValue} tile-moving`;
+                this.element.classList.add('tile-pop');
+                setTimeout(() => {
+                    this.element.classList.remove('tile-pop');
+                }, 200);
+            }
+
+            remove() {
+                this.element.remove();
+            }
+        }
+
+        class GameManager {
+            constructor() {
+                this.gridContainer = document.getElementById('grid-bg-layer');
+                this.tileContainer = document.getElementById('tile-container');
+                this.scoreEl = document.getElementById('score');
+                this.gameOverEl = document.getElementById('game-over');
+                this.tiles = [];
+                this.score = 0;
+                
+                this.initGridBg();
+                this.setupInput();
+
+                window.addEventListener('resize', () => {
+                    updateMetrics();
+                    this.gridContainer.innerHTML = '';
+                    this.drawGridBg();
+                    this.tiles.forEach(t => t.updatePosition());
+                });
+                
+                document.body.addEventListener('click', () => soundManager.init(), {once:true});
+                document.body.addEventListener('keydown', () => soundManager.init(), {once:true});
+
+                this.restart();
+            }
+
+            initGridBg() {
+                updateMetrics();
+                this.drawGridBg();
+            }
+
+            drawGridBg() {
+                for (let r = 0; r < GRID_SIZE; r++) {
+                    for (let c = 0; c < GRID_SIZE; c++) {
+                        let cell = document.createElement('div');
+                        cell.className = 'grid-cell';
+                        cell.style.left = (c * (TILE_SIZE + TILE_GAP) + TILE_GAP) + 'px';
+                        cell.style.top = (r * (TILE_SIZE + TILE_GAP) + TILE_GAP) + 'px';
+                        this.gridContainer.appendChild(cell);
+                    }
+                }
+            }
+
+            restart() {
+                this.tiles.forEach(t => t.remove());
+                this.tiles = [];
+                this.score = 0;
+                this.updateScore();
+                this.gameOverEl.classList.remove('show');
+                this.addRandomTile();
+                this.addRandomTile();
+            }
+
+            getTileAt(x, y) {
+                return this.tiles.find(t => t.x === x && t.y === y && !t.markedForDeletion);
+            }
+
+            addRandomTile() {
+                let emptyCells = [];
+                for (let x = 0; x < GRID_SIZE; x++) {
+                    for (let y = 0; y < GRID_SIZE; y++) {
+                        if (!this.getTileAt(x, y)) {
+                            emptyCells.push({x, y});
+                        }
+                    }
+                }
+                if (emptyCells.length > 0) {
+                    let pos = emptyCells[Math.floor(Math.random() * emptyCells.length)];
+                    let val = Math.random() < 0.9 ? 2 : 4;
+                    this.tiles.push(new Tile(this.tileContainer, val, pos.x, pos.y));
+                }
+            }
+
+            move(direction) {
+                const vector = this.getVector(direction);
+                const traversals = this.buildTraversals(vector);
+                let moved = false;
+                let merged = false;
+
+                this.tiles.forEach(t => t.mergedFrom = null);
+
+                traversals.x.forEach(x => {
+                    traversals.y.forEach(y => {
+                        let tile = this.getTileAt(x, y);
+                        if (tile) {
+                            let positions = this.findFarthestPosition({x, y}, vector);
+                            let next = this.getTileAt(positions.next.x, positions.next.y);
+
+                            if (next && next.value === tile.value && !next.mergedFrom) {
+                                tile.x = next.x;
+                                tile.y = next.y;
+                                tile.updatePosition();
+                                tile.markedForDeletion = true; 
+                                
+                                next.mergedFrom = true;
+                                next.value *= 2;
+                                this.score += next.value;
+
+                                setTimeout(() => {
+                                    tile.remove();
+                                    this.tiles = this.tiles.filter(t => t !== tile);
+                                    next.updateValue(next.value);
+                                }, 150);
+                                moved = true;
+                                merged = true;
+                            } else {
+                                if (positions.farthest.x !== x || positions.farthest.y !== y) {
+                                    tile.x = positions.farthest.x;
+                                    tile.y = positions.farthest.y;
+                                    tile.updatePosition();
+                                    moved = true;
+                                }
+                            }
+                        }
+                    });
+                });
+
+                if (moved) {
+                    if (merged) soundManager.play('merge');
+                    else soundManager.play('move');
+
+                    this.updateScore();
+                    setTimeout(() => {
+                        this.addRandomTile();
+                        if (!this.movesAvailable()) {
+                            this.gameOverEl.classList.add('show');
+                            soundManager.play('gameover');
+                        }
+                    }, 150);
+                }
+            }
+
+            getVector(direction) {
+                const map = { 0: { x: 0, y: -1 }, 1: { x: 1, y: 0 }, 2: { x: 0, y: 1 }, 3: { x: -1, y: 0 } };
+                return map[direction];
+            }
+
+            buildTraversals(vector) {
+                let traversals = { x: [], y: [] };
+                for (let pos = 0; pos < GRID_SIZE; pos++) {
+                    traversals.x.push(pos);
+                    traversals.y.push(pos);
+                }
+                if (vector.x === 1) traversals.x = traversals.x.reverse();
+                if (vector.y === 1) traversals.y = traversals.y.reverse();
+                return traversals;
+            }
+
+            findFarthestPosition(cell, vector) {
+                let previous;
+                do {
+                    previous = cell;
+                    cell = { x: previous.x + vector.x, y: previous.y + vector.y };
+                } while (
+                    this.withinBounds(cell) &&
+                    !this.getTileAt(cell.x, cell.y)
+                );
+                return { farthest: previous, next: cell };
+            }
+
+            withinBounds(position) {
+                return position.x >= 0 && position.x < GRID_SIZE && position.y >= 0 && position.y < GRID_SIZE;
+            }
+
+            movesAvailable() {
+                let tiles = this.tiles.filter(t => !t.markedForDeletion);
+                if (tiles.length < 16) return true;
+                for (let t of tiles) {
+                    for (let dir = 0; dir < 4; dir++) {
+                        let vector = this.getVector(dir);
+                        let neighbor = this.getTileAt(t.x + vector.x, t.y + vector.y);
+                        if (neighbor && neighbor.value === t.value) return true;
+                    }
+                }
+                return false;
+            }
+
+            updateScore() { this.scoreEl.innerText = this.score; }
+
+            setupInput() {
+                document.addEventListener('keydown', (e) => {
+                    const map = { 'ArrowUp': 0, 'ArrowRight': 1, 'ArrowDown': 2, 'ArrowLeft': 3 };
+                    if (map[e.key] !== undefined) {
+                        e.preventDefault();
+                        this.move(map[e.key]);
+                    }
+                });
+
+                let startX, startY;
+                this.gridContainer.parentNode.addEventListener('touchstart', (e) => {
+                    startX = e.changedTouches[0].screenX;
+                    startY = e.changedTouches[0].screenY;
+                }, {passive: false});
+
+                this.gridContainer.parentNode.addEventListener('touchend', (e) => {
+                    let dx = e.changedTouches[0].screenX - startX;
+                    let dy = e.changedTouches[0].screenY - startY;
+                    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 30) this.move(dx > 0 ? 1 : 3);
+                    else if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 30) this.move(dy > 0 ? 2 : 0);
+                }, {passive: false});
+            }
+        }
+
+        const game = new GameManager();
+    </script>
+</body>
+</html>
